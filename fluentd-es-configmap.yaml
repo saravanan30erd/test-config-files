@@ -17,10 +17,11 @@ data:
       @type tail
       path /var/log/containers/moi*.log
       pos_file /var/log/es-containers.log.pos
-      time_format %Y-%m-%dT%H:%M:%S.%NZ
       tag raw.kubernetes.*
       read_from_head true
-      format json
+      <parse>
+        @type json
+      </parse>
     </source>
 
     # Detect exceptions in the log output and forward them as one log entry.
@@ -42,12 +43,25 @@ data:
     </filter>
     <filter kubernetes.**>
       @type parser
-      format json # apache2, nginx, etc...
       key_name log
       reserve_data true
-      time_key time
-      time_format %Y-%m-%dT%H:%M:%S.%NZ
-      keep_time_key true
+      #remove_key_name_field true
+      <parse>
+        @type json
+        time_key time # Use "time" field from log for timestamp
+        time_format %Y-%m-%dT%H:%M:%S.%NZ
+        keep_time_key true
+      </parse>
+    </filter>
+    <filter kubernetes.**>
+      @type parser
+      key_name req-headers
+      reserve_data true
+      reserve_time true # Keep original event time
+      #remove_key_name_field true
+      <parse>
+        @type json
+      </parse>
     </filter>
 
     <match **>
@@ -63,7 +77,7 @@ data:
         path /var/log/fluentd-buffers/kubernetes.system.buffer
         flush_mode interval
         retry_type exponential_backoff
-        flush_thread_count 2
+        flush_thread_count 4
         flush_interval 5s
         retry_forever
         retry_max_interval 30
